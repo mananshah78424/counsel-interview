@@ -18,8 +18,29 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
   const [messages, setMessages] = useState<Message[]>([]);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
+  // Debug logging
+  console.log("Chat component render:", {
+    hasThread: !!thread,
+    threadId: thread?.id,
+    hasSearchResults: !!searchResults,
+    searchResultsCount: searchResults?.results?.length || 0,
+    messagesCount: messages.length
+  });
+
+  // Clear messages when search results exist to prevent overlap
   useEffect(() => {
-    if (!thread) return;
+    if (searchResults && searchResults.results) {
+      console.log("Search results exist, clearing messages");
+      setMessages([]);
+    }
+  }, [searchResults]);
+
+  useEffect(() => {
+    if (!thread) {
+      // Clear messages when no thread is selected
+      setMessages([]);
+      return;
+    }
 
     handlePromiseRejection(async () => {
       const fetchedMessages = await getMessagesForThread(thread.id);
@@ -40,8 +61,7 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
           block: 'center' 
         });
         
-        // Remove highlight after a few seconds
-        setTimeout(() => setHighlightedMessageId(null), 3000);
+        // Keep the highlight persistent (removed timeout)
       }
     }
   }, [scrollToMessageId, messages]);
@@ -57,32 +77,45 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
     [sortedMessages]
   );
 
-  // If we have search results, show them instead of thread
-  if (searchResults) {
+  // If we have search results, show ONLY the search results - nothing else
+  if (searchResults && searchResults.results) {
     return (
       <div className="relative flex w-full flex-col flex-grow bg-cover h-full">
         <div className="flex flex-col overflow-y-scroll sm:px-[15%] flex-grow p-5">
           {/* Search Results Header */}
-          <div className="mb-6 p-4 bg-blue-50 rounded-lg border">
+          <div className="mb-6 p-4 rounded-lg">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-xl font-semibold text-blue-900">
                 Search Results for "{searchResults.searchText}"
               </h2>
-              <span className="text-sm text-blue-600 bg-blue-100 px-2 py-1 rounded">
-                {searchResults.totalResults} results
-              </span>
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                  {searchResults.totalResults} results
+                </div>
+                <button 
+                  onClick={() => onThreadSelect("", undefined)}
+                  className="text-sm text-gray-600 hover:text-gray-800 px-2 py-1 rounded border hover:bg-gray-50"
+                >
+                  Clear Search
+                </button>
+              </div>
             </div>
             
-            {searchResults.searchTokens && searchResults.searchTokens.length > 0 && (
-              <p className="text-sm text-blue-600 mb-3">
-                Search tokens: {searchResults.searchTokens.join(", ")}
-              </p>
+            {searchResults.spellingCorrections && searchResults.spellingCorrections.length > 0 && (
+              <div className="mb-3 p-3 bg-blue-50">
+                <div className="text-sm text-blue-800 font-medium mb-1">
+                   Spelling corrections applied
+                </div>
+                <div className="text-xs text-blue-700">
+                  Corrected terms: {searchResults.spellingCorrections.join(", ")}
+                </div>
+              </div>
             )}
             
-            {searchResults.expandedSearch && searchResults.semanticTokens && (
-              <div className="mb-3 p-3 bg-green-50 rounded-lg border border-green-200">
+            {searchResults.expandedSearch && searchResults.semanticTokens.length > 0 && (
+              <div className="mb-3 p-3 bg-green-50">
                 <div className="text-sm text-green-800 font-medium mb-1">
-                  🔍 Semantic search expanded with synonyms
+                  Semantic search expanded with synonyms
                 </div>
                 <div className="text-xs text-green-700">
                   Additional terms searched: {searchResults.semanticTokens.join(", ")}
@@ -109,7 +142,7 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
                     {/* Thread Header */}
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-blue-800 bg-blue-100 px-3 py-1 rounded-full">
+                        <span className="text-sm font-medium text-blue-800 bg-blue-100 px-3 py-1 rounded">
                           {result.threadName || 'Unknown Thread'}
                         </span>
                         <span className="text-xs text-gray-500">
@@ -128,9 +161,7 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
                     {/* Context Messages Preview */}
                     {result.context && result.context.length > 0 && (
                       <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                        <div className="text-xs text-gray-500 mb-2 font-medium">
-                          Conversation context:
-                        </div>
+                        
                         <div className="space-y-2">
                           {result.context.map((ctxMsg: any, ctxIndex: number) => {
                             const isMatchedMessage = ctxMsg.id.toString() === result.messageId;
@@ -152,22 +183,14 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
                                   }`}
                                 >
                                   <div className="flex items-start gap-2">
-                                    {isPhysician && (
-                                      <span className="text-xs text-gray-400 font-mono flex-shrink-0">
-                                        {ctxMsg.msgIndex}
-                                      </span>
-                                    )}
+                                    
                                     <span className="text-gray-700">
                                       {ctxMsg.message.length > 120 
                                         ? ctxMsg.message.substring(0, 120) + '...' 
                                         : ctxMsg.message
                                       }
                                     </span>
-                                    {!isPhysician && (
-                                      <span className="text-xs text-gray-400 font-mono flex-shrink-0">
-                                        {ctxMsg.msgIndex}
-                                      </span>
-                                    )}
+                                    
                                   </div>
                                   {isMatchedMessage && (
                                     <div className="text-xs text-yellow-700 mt-1 font-medium">
@@ -181,11 +204,7 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
                         </div>
                       </div>
                     )}
-                    
-                    {/* Click Instruction */}
-                    <div className="text-xs text-blue-600 text-center border-t pt-2">
-                      Click to view this conversation at the highlighted message
-                    </div>
+                
                   </div>
                 ))}
                 
@@ -202,8 +221,16 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
     );
   }
 
-  // Show thread messages if no search results
-  if (thread === null) return null;
+  // Show thread messages ONLY if no search results and we have a thread
+  if (searchResults && searchResults.results) {
+    console.log("Search results exist, not showing thread messages");
+    return null;
+  }
+  
+  if (thread === null) {
+    console.log("No thread selected, not showing messages");
+    return null;
+  }
 
   return (
     <div className="relative flex w-full flex-col flex-grow bg-cover h-full">

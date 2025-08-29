@@ -56,6 +56,54 @@ const getSemanticSynonyms = (term: string): string[] => {
   return SEMANTIC_MAP[lowerTerm] || [];
 };
 
+// Function to calculate Levenshtein edit distance between two strings
+const levenshteinDistance = (str1: string, str2: string): number => {
+  const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+  
+  for (let i = 0; i <= str1.length; i++) {
+    matrix[0][i] = i;
+  }
+  
+  for (let j = 0; j <= str2.length; j++) {
+    matrix[j][0] = j;
+  }
+  
+  for (let j = 1; j <= str2.length; j++) {
+    for (let i = 1; i <= str1.length; i++) {
+      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      matrix[j][i] = Math.min(
+        matrix[j][i - 1] + 1, // deletion
+        matrix[j - 1][i] + 1, // insertion
+        matrix[j - 1][i - 1] + indicator // substitution
+      );
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
+};
+
+// Function to find spelling corrections for a term
+const findSpellingCorrections = (term: string, searchIndex: any, maxDistance: number = 2): string[] => {
+  const corrections: { word: string; distance: number }[] = [];
+  const lowerTerm = term.toLowerCase();
+  
+  // Get all available words from the search index
+  const availableWords = Object.keys(searchIndex);
+  
+  availableWords.forEach(word => {
+    const distance = levenshteinDistance(lowerTerm, word);
+    if (distance <= maxDistance && distance > 0) { // Don't include exact matches
+      corrections.push({ word, distance });
+    }
+  });
+  
+  // Sort by distance and return top matches
+  return corrections
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 5) // Limit to top 5 corrections
+    .map(correction => correction.word);
+};
+
 // Function to check if we need semantic expansion
 const needsSemanticExpansion = (searchIndex: any, tokens: string[]): boolean => {
   let totalMatches = 0;
@@ -123,6 +171,8 @@ export const getSearchedText = async (searchText: string) => {
     // Find exact matches first
     const exactMatches = new Set<string>();
     const usedTokens = new Set<string>();
+    let spellingCorrections: string[] = [];
+    let usedSpellingCorrections = new Set<string>();
     
     searchTokens.forEach(token => {
       if (searchIndex[token]) {
@@ -132,6 +182,24 @@ export const getSearchedText = async (searchText: string) => {
           exactMatches.add(item);
         });
         usedTokens.add(token);
+      } else {
+        // No exact match found, try spelling corrections
+        const corrections = findSpellingCorrections(token, searchIndex, 2);
+        if (corrections.length > 0) {
+          console.log(`Spelling corrections for "${token}":`, corrections);
+          spellingCorrections.push(...corrections);
+          usedSpellingCorrections.add(token);
+        }
+      }
+    });
+    
+    // Add results from spelling corrections
+    spellingCorrections.forEach(correction => {
+      if (searchIndex[correction]) {
+        console.log(`Spelling correction "${correction}":`, searchIndex[correction].length, "results");
+        searchIndex[correction].forEach((item: string) => {
+          exactMatches.add(item);
+        });
       }
     });
     
@@ -146,7 +214,7 @@ export const getSearchedText = async (searchText: string) => {
       
       // Get synonyms for each token that had no results
       searchTokens.forEach(token => {
-        if (!usedTokens.has(token)) {
+        if (!usedTokens.has(token) && !usedSpellingCorrections.has(token)) {
           const synonyms = getSemanticSynonyms(token);
           console.log(`Synonyms for "${token}":`, synonyms);
           semanticTokens.push(...synonyms);
@@ -161,7 +229,7 @@ export const getSearchedText = async (searchText: string) => {
       
       // Remove duplicates and filter out tokens we already searched
       semanticTokens = Array.from(new Set(semanticTokens)).filter(token => 
-        !usedTokens.has(token) && token.length > 2
+        !usedTokens.has(token) && !spellingCorrections.includes(token) && token.length > 2
       );
       
       console.log("Semantic tokens to search:", semanticTokens);
@@ -296,6 +364,10 @@ export const getSearchedText = async (searchText: string) => {
     console.log(`- Exact matches: ${exactMatchCount}`);
     console.log(`- Semantic matches: ${semanticMatchCount}`);
     
+    if (spellingCorrections.length > 0) {
+      console.log(`Spelling corrections used: ${spellingCorrections.join(', ')}`);
+    }
+    
     if (expandedSearch) {
       console.log(`Semantic expansion used. Additional tokens: ${semanticTokens.join(', ')}`);
     }
@@ -306,6 +378,7 @@ export const getSearchedText = async (searchText: string) => {
       exactMatchCount,
       semanticMatchCount,
       searchTokens,
+      spellingCorrections: spellingCorrections.length > 0 ? spellingCorrections : [],
       semanticTokens: expandedSearch ? semanticTokens : [],
       expandedSearch,
       searchText

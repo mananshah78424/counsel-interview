@@ -24,6 +24,7 @@ export default function ChatApp() {
 
   // Handle search results from LeftMenu
   const handleSearchResults = (results: any) => {
+    console.log("Setting search results:", results);
     setSearchResults(results);
     // Clear current thread when showing search results
     setCurrentThreadId("");
@@ -32,6 +33,7 @@ export default function ChatApp() {
 
   // Handle thread selection (clear search results)
   const handleThreadSelection = (threadId: string) => {
+    console.log("Thread selection:", threadId);
     setCurrentThreadId(threadId);
     setSearchResults(null);
     setScrollToMessageId(null);
@@ -39,9 +41,19 @@ export default function ChatApp() {
 
   // Handle search result click with specific message
   const handleSearchResultClick = (threadId: string, messageId?: string) => {
-    setCurrentThreadId(threadId);
-    setSearchResults(null);
-    setScrollToMessageId(messageId || null);
+    if (threadId === "") {
+      // Clear search results and return to thread list
+      console.log("Clearing search results");
+      setSearchResults(null);
+      setCurrentThreadId("");
+      setScrollToMessageId(null);
+    } else {
+      // Navigate to specific thread and message
+      console.log("Navigating to thread:", threadId, "message:", messageId);
+      setCurrentThreadId(threadId);
+      setSearchResults(null);
+      setScrollToMessageId(messageId || null);
+    }
   };
 
   useEffect(() => {
