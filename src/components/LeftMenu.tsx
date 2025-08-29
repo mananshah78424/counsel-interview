@@ -30,19 +30,19 @@ export default function LeftMenu({
   );
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
     const value = e.target.value;
     setSearchQuery(value);
   };
 
-  const handleSearchClick = async () => {
+  const handleSearchSubmit = async () => {
     if (searchQuery.trim()) {
       setIsSearching(true);
       try {
         const result = await getSearchedText(searchQuery);
         // Instead of setting local state, pass results to parent
         onSearchResults(result);
-        // Clear the search query
-        setSearchQuery("");
+        // Keep the search query in the input field
       } catch (error) {
         console.error("Search error:", error);
         onSearchResults({ 
@@ -52,10 +52,21 @@ export default function LeftMenu({
           searchText: searchQuery,
           error: "Search failed" 
         });
-        setSearchQuery("");
+        // Keep the search query even on error
       } finally {
         setIsSearching(false);
       }
+    }
+  };
+
+  const handleSearchClick = () => {
+    handleSearchSubmit();
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearchSubmit();
     }
   };
 
@@ -77,6 +88,7 @@ export default function LeftMenu({
           <Input
             value={searchQuery}
             onChange={handleSearchChange}
+            onKeyPress={handleKeyPress}
             className="flex-1 bg-white"
             placeholder="Search messages..."
           />

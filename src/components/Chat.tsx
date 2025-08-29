@@ -79,6 +79,17 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
               </p>
             )}
             
+            {searchResults.expandedSearch && searchResults.semanticTokens && (
+              <div className="mb-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                <div className="text-sm text-green-800 font-medium mb-1">
+                  🔍 Semantic search expanded with synonyms
+                </div>
+                <div className="text-xs text-green-700">
+                  Additional terms searched: {searchResults.semanticTokens.join(", ")}
+                </div>
+              </div>
+            )}
+            
             {searchResults.error ? (
               <div className="text-red-600 p-3 bg-red-50 rounded border">
                 {searchResults.error}
@@ -106,9 +117,6 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
                         </span>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded font-medium">
-                          Score: {result.score}
-                        </span>
                         {result.timestamp && (
                           <span className="text-xs text-gray-500">
                             {new Date(result.timestamp).toLocaleTimeString()}
@@ -117,43 +125,60 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
                       </div>
                     </div>
                     
-                    {/* Matched Phrases Info */}
-                    {result.matchedPhrases && result.matchedPhrases.length > 0 && (
-                      <div className="mb-3 p-2 bg-blue-50 rounded border-l-4 border-blue-400">
-                        <div className="text-xs text-blue-700 font-medium mb-1">
-                          Why this matched:
-                        </div>
-                        <div className="text-xs text-blue-600">
-                          {result.matchedPhrases.join(' • ')}
-                        </div>
-                      </div>
-                    )}
-                    
                     {/* Context Messages Preview */}
                     {result.context && result.context.length > 0 && (
-                      <div className="space-y-2 mb-3">
-                        {result.context.map((ctxMsg: any, ctxIndex: number) => (
-                          <div 
-                            key={ctxMsg.id}
-                            className={`text-sm p-2 rounded ${
-                              ctxMsg.id.toString() === result.messageId
-                                ? 'bg-yellow-100 border-l-4 border-yellow-400' // Highlight matched message
-                                : 'bg-gray-50'
-                            }`}
-                          >
-                            <div className="flex items-start gap-2">
-                              <span className="text-xs text-gray-400 font-mono">
-                                {ctxMsg.msgIndex}
-                              </span>
-                              <span className="text-gray-700">
-                                {ctxMsg.message.length > 150 
-                                  ? ctxMsg.message.substring(0, 150) + '...' 
-                                  : ctxMsg.message
-                                }
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-gray-500 mb-2 font-medium">
+                          Conversation context:
+                        </div>
+                        <div className="space-y-2">
+                          {result.context.map((ctxMsg: any, ctxIndex: number) => {
+                            const isMatchedMessage = ctxMsg.id.toString() === result.messageId;
+                            // Use the same logic as ChatMessage: physician on left, patient on right
+                            const isPhysician = ctxMsg.userId === 'user2'; // Assuming user2 is physician
+                            
+                            return (
+                              <div 
+                                key={ctxMsg.id}
+                                className={`flex ${isPhysician ? 'justify-start' : 'justify-end'}`}
+                              >
+                                <div 
+                                  className={`max-w-[80%] p-2 rounded-lg text-sm ${
+                                    isMatchedMessage
+                                      ? 'bg-yellow-100 border-2 border-yellow-400' // Highlight matched message
+                                      : isPhysician
+                                      ? 'bg-white border border-gray-200' // Physician messages on left
+                                      : 'bg-blue-100 text-blue-900' // Patient messages on right
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-2">
+                                    {isPhysician && (
+                                      <span className="text-xs text-gray-400 font-mono flex-shrink-0">
+                                        {ctxMsg.msgIndex}
+                                      </span>
+                                    )}
+                                    <span className="text-gray-700">
+                                      {ctxMsg.message.length > 120 
+                                        ? ctxMsg.message.substring(0, 120) + '...' 
+                                        : ctxMsg.message
+                                      }
+                                    </span>
+                                    {!isPhysician && (
+                                      <span className="text-xs text-gray-400 font-mono flex-shrink-0">
+                                        {ctxMsg.msgIndex}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {isMatchedMessage && (
+                                    <div className="text-xs text-yellow-700 mt-1 font-medium">
+                                      ← This message matched your search
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                     
