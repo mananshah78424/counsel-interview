@@ -143,7 +143,7 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-blue-800 bg-blue-100 px-3 py-1 rounded">
-                          {result.threadName || 'Unknown Thread'}
+                          {result.threadName || 'Thread Not Found'}
                         </span>
                         <span className="text-xs text-gray-500">
                           {result.timestamp && new Date(result.timestamp).toLocaleDateString()}
@@ -174,7 +174,7 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
                                 className={`flex ${isPhysician ? 'justify-start' : 'justify-end'}`}
                               >
                                 <div 
-                                  className={`max-w-[80%] p-2 rounded-lg text-sm ${
+                                  className={`max-w-[80%] p-4 rounded-lg text-sm ${
                                     isMatchedMessage
                                       ? 'bg-yellow-100 border-2 border-yellow-400' // Highlight matched message
                                       : isPhysician
@@ -185,18 +185,40 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
                                   <div className="flex items-start gap-2">
                                     
                                     <span className="text-gray-700">
-                                      {ctxMsg.message.length > 120 
-                                        ? ctxMsg.message.substring(0, 120) + '...' 
-                                        : ctxMsg.message
-                                      }
+                                      {(() => {
+                                        let displayText = ctxMsg.message.length > 120 
+                                          ? ctxMsg.message.substring(0, 120) + '...' 
+                                          : ctxMsg.message;
+                                        
+                                        // Make search terms bold
+                                        if (searchResults.searchTokens) {
+                                          searchResults.searchTokens.forEach((token: string) => {
+                                            const regex = new RegExp(`(${token})`, 'gi');
+                                            displayText = displayText.replace(regex, '<strong>$1</strong>');
+                                          });
+                                        }
+                                        
+                                        // Also make spelling corrections bold
+                                        if (searchResults.spellingCorrections) {
+                                          searchResults.spellingCorrections.forEach((correction: string) => {
+                                            const regex = new RegExp(`(${correction})`, 'gi');
+                                            displayText = displayText.replace(regex, '<strong>$1</strong>');
+                                          });
+                                        }
+                                        
+                                        return <span dangerouslySetInnerHTML={{ __html: displayText }} />;
+                                      })()}
                                     </span>
                                     
                                   </div>
-                                  {isMatchedMessage && (
-                                    <div className="text-xs text-yellow-700 mt-1 font-medium">
-                                      ← This message matched your search
-                                    </div>
-                                  )}
+                                  
+                                  {/* Message timestamp */}
+                                  <div className="flex justify-end mt-1">
+                                    <span className="text-xs text-gray-500">
+                                      {ctxMsg.timestamp && new Date(ctxMsg.timestamp).toLocaleTimeString()}
+                                    </span>
+                                  </div>
+                                 
                                 </div>
                               </div>
                             );

@@ -299,7 +299,7 @@ export const getSearchedText = async (searchText: string) => {
           threadId,
           messageId,
           timestamp: timestampMap.get(messageId) || 0,
-          threadName: threadNameMap.get(threadId) || 'Unknown Thread',
+          threadName: threadNameMap.get(threadId) || 'Thread Not Found',
           isExactMatch // Flag to identify exact vs synonym matches
         };
       })
