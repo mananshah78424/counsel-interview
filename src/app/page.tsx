@@ -16,9 +16,33 @@ export default function ChatApp() {
   const [currentThreadId, setCurrentThreadId] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [searchResults, setSearchResults] = useState<any>(null);
+  const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null);
 
   const currentThread =
     threads.find((thread) => thread.id === currentThreadId) ?? null;
+
+  // Handle search results from LeftMenu
+  const handleSearchResults = (results: any) => {
+    setSearchResults(results);
+    // Clear current thread when showing search results
+    setCurrentThreadId("");
+    setScrollToMessageId(null);
+  };
+
+  // Handle thread selection (clear search results)
+  const handleThreadSelection = (threadId: string) => {
+    setCurrentThreadId(threadId);
+    setSearchResults(null);
+    setScrollToMessageId(null);
+  };
+
+  // Handle search result click with specific message
+  const handleSearchResultClick = (threadId: string, messageId?: string) => {
+    setCurrentThreadId(threadId);
+    setSearchResults(null);
+    setScrollToMessageId(messageId || null);
+  };
 
   useEffect(() => {
     handlePromiseRejection(async () => {
@@ -37,11 +61,18 @@ export default function ChatApp() {
       >
         <LeftMenu
           currentThreadId={currentThreadId}
-          setCurrentThreadId={setCurrentThreadId}
+          setCurrentThreadId={handleThreadSelection}
           threads={threads}
+          onSearchResults={handleSearchResults}
         />
         <div className="items-center whitespace-normal w-full inline-flex flex-shrink-1 flex-col h-[calc(100dvh)] bg-background-surface align-top transition-opacity relative min-w-0">
-          <Chat users={users} thread={currentThread} />
+          <Chat 
+            users={users} 
+            thread={currentThread} 
+            searchResults={searchResults}
+            onThreadSelect={handleSearchResultClick}
+            scrollToMessageId={scrollToMessageId}
+          />
         </div>
        
       </div>
