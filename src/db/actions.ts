@@ -76,7 +76,6 @@ export const getSearchedText = async (searchText: string) => {
     // Find ALL matching results for each token
     const allResults = new Set<string>(); // Use Set to avoid duplicates
     
-    // todo - might want to come back here to create a combined search index for all tokens found
     searchTokens.forEach(token => {
       if (searchIndex[token]) {
         console.log("Length of searchIndex[token]:", searchIndex[token].length);
@@ -87,7 +86,7 @@ export const getSearchedText = async (searchText: string) => {
       }
     });
     
-    // Get the database connection to fetch timestamps
+    // Get the database connection to fetch additional data
     const db = await getDB();
     
     // Fetch timestamps for all message IDs to enable proper date sorting
@@ -108,6 +107,24 @@ export const getSearchedText = async (searchText: string) => {
       timestampResults.map(row => [row.id.toString(), row.timestamp])
     );
     
+    // Get unique thread IDs to fetch thread names
+    const uniqueThreadIds = Array.from(allResults).map((item: string) => {
+      const [threadId, messageId] = item.split(':');
+      return threadId;
+    });
+    
+    // Fetch thread names
+    const threadQuery = `
+      SELECT id, title 
+      FROM threads 
+      WHERE id IN (${uniqueThreadIds.map(() => '?').join(',')})
+    `;
+    
+    const threadResults = await db.all(threadQuery, uniqueThreadIds);
+    const threadNameMap = new Map(
+      threadResults.map(row => [row.id, row.title])
+    );
+    
     // Convert to results array with timestamps and sort by date (most recent first)
     const searchResults = Array.from(allResults)
       .map((item: string) => {
@@ -115,17 +132,60 @@ export const getSearchedText = async (searchText: string) => {
         return {
           threadId,
           messageId,
-          timestamp: timestampMap.get(messageId) || 0
+          timestamp: timestampMap.get(messageId) || 0,
+          threadName: threadNameMap.get(threadId) || 'Unknown Thread'
         };
       })
       .sort((a, b) => b.timestamp - a.timestamp) // Most recent first
       .slice(0, 100); // Limit to top 100 results
     
-    console.log(`Found ${searchResults.length} results for tokens: ${searchTokens.join(', ')}`);
+    // Now fetch context messages for each result (2-3 before and after)
+    const enhancedResults = await Promise.all(
+      searchResults.map(async (result) => {
+        try {
+          // Get message index for the matched message
+          const messageQuery = `
+            SELECT msgIndex 
+            FROM messages 
+            WHERE id = ?
+          `;
+          const messageResult = await db.get(messageQuery, [result.messageId]);
+          const msgIndex = messageResult?.msgIndex || 0;
+          
+          // Fetch context messages (2 before, 2 after, plus the matched message)
+          const contextQuery = `
+            SELECT id, message, msgIndex, timestamp
+            FROM messages 
+            WHERE threadId = ? 
+            AND msgIndex BETWEEN ? AND ?
+            ORDER BY msgIndex
+          `;
+          
+          const contextStart = Math.max(0, msgIndex - 2);
+          const contextEnd = msgIndex + 2;
+          
+          const contextMessages = await db.all(contextQuery, [
+            result.threadId, 
+            contextStart, 
+            contextEnd
+          ]);
+          
+          return {
+            ...result,
+            context: contextMessages
+          };
+        } catch (error) {
+          console.error(`Error fetching context for message ${result.messageId}:`, error);
+          return result;
+        }
+      })
+    );
+    
+    console.log(`Found ${enhancedResults.length} results for tokens: ${searchTokens.join(', ')}`);
     
     return {
-      results: searchResults,
-      totalResults: searchResults.length,
+      results: enhancedResults,
+      totalResults: enhancedResults.length,
       searchTokens,
       searchText
     };

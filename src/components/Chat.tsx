@@ -95,26 +95,71 @@ export const Chat: FC<Props> = ({ thread, users, searchResults, onThreadSelect, 
                     className="p-4 bg-white rounded-lg border hover:border-blue-300 cursor-pointer transition-colors"
                     onClick={() => onThreadSelect(result.threadId, result.messageId)}
                   >
-                    <div className="flex justify-between items-start mb-2">
+                    {/* Thread Header */}
+                    <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-blue-800 bg-blue-100 px-2 py-1 rounded">
-                          Thread: {result.threadId?.slice(0, 8) || 'Unknown'}...
+                        <span className="text-sm font-medium text-blue-800 bg-blue-100 px-3 py-1 rounded-full">
+                          {result.threadName || 'Unknown Thread'}
                         </span>
                         <span className="text-xs text-gray-500">
-                          Message ID: {result.messageId}
+                          {result.timestamp && new Date(result.timestamp).toLocaleDateString()}
                         </span>
                       </div>
                       <div className="flex flex-col items-end gap-1">
+                        <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded font-medium">
+                          Score: {result.score}
+                        </span>
                         {result.timestamp && (
                           <span className="text-xs text-gray-500">
-                            {new Date(result.timestamp).toLocaleDateString()} {new Date(result.timestamp).toLocaleTimeString()}
+                            {new Date(result.timestamp).toLocaleTimeString()}
                           </span>
                         )}
                       </div>
                     </div>
                     
-                    <div className="mt-2 text-xs text-gray-500">
-                      Click to view this conversation at the specific message
+                    {/* Matched Phrases Info */}
+                    {result.matchedPhrases && result.matchedPhrases.length > 0 && (
+                      <div className="mb-3 p-2 bg-blue-50 rounded border-l-4 border-blue-400">
+                        <div className="text-xs text-blue-700 font-medium mb-1">
+                          Why this matched:
+                        </div>
+                        <div className="text-xs text-blue-600">
+                          {result.matchedPhrases.join(' • ')}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Context Messages Preview */}
+                    {result.context && result.context.length > 0 && (
+                      <div className="space-y-2 mb-3">
+                        {result.context.map((ctxMsg: any, ctxIndex: number) => (
+                          <div 
+                            key={ctxMsg.id}
+                            className={`text-sm p-2 rounded ${
+                              ctxMsg.id.toString() === result.messageId
+                                ? 'bg-yellow-100 border-l-4 border-yellow-400' // Highlight matched message
+                                : 'bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-start gap-2">
+                              <span className="text-xs text-gray-400 font-mono">
+                                {ctxMsg.msgIndex}
+                              </span>
+                              <span className="text-gray-700">
+                                {ctxMsg.message.length > 150 
+                                  ? ctxMsg.message.substring(0, 150) + '...' 
+                                  : ctxMsg.message
+                                }
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Click Instruction */}
+                    <div className="text-xs text-blue-600 text-center border-t pt-2">
+                      Click to view this conversation at the highlighted message
                     </div>
                   </div>
                 ))}
